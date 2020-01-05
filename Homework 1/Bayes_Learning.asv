@@ -1,0 +1,99 @@
+% CSCI 5521 Homework 1
+% Brian Cooper (coope824 | )
+
+% BAYES_LEARNING Learns a model using Bayes Theorem.
+%   [in] training_data:
+%   [in] validation_data:
+%   [out] p1: learned Bernoulli parameters for C1
+%   [out] p2: learned Bernoulli parameters for C2
+%   [out] pc1: optimal prior for C1
+%   [out] pc2: optimal prior for C2
+function [p1, p2, pc1, pc2] = Bayes_Learning(training_data, validation_data)
+% Variable aliasing for convenience
+t = training_data(:, 1:end-1);
+v = validation_data(:,1:end-1);
+
+% Extract label column from training & validation sets
+tClassLabels = training_data(:, end);
+vClassLabels = validation_data(:,end);
+
+% logical array for records of class 1 and class 2
+T1_i = (tClassLabels(:) == 1);
+T2_i = (tClassLabels(:  ) == 2);
+
+% Extract records for class 1 and class 2 into separate matrix.
+% To be used for computing p(x=0|C1) and p(x=0|C2)
+T1 = t(T1_i,:);
+T2 = t(T2_i,:);
+
+% p1 is the ratio of records where xi is 0 to the total number records 
+% of class C1
+p1 = (sum((T1(:,:)==0))/size(T1,1))';
+
+% Similarly p2 for class C2
+p2 = (sum((T2(:,:)==0))/size(T2,1))';
+
+% Initialize sigma
+sigma = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 2, 3, 4, 5, 6];
+
+% Compute the prior for each sigma
+tPC1 = 1./(1+exp(-sigma));
+tPC2 = 1 - tPC1;
+
+% vectors for determinant function and predictions
+g1 = zeros(size(validation_data,1),1);
+g2 = zeros(size(validation_data,1),1);
+pred_for_sigma = zeros(size(validation_data,1),1);
+
+% to decide on best sigma
+tResult = zeros(size(sigma,2),1);
+
+for i=1:size(sigma,2)
+    for ii=1:size(validation_data,1)
+        
+        % Compute likelihood probabilities for C1 and C2
+        p0C1 = p1.^(1-v(ii, :)');
+        p1C1 = (1-p1).^(v(ii,:)');
+        
+        p0C2 = p2.^(1-v(ii, :)');
+        p1C2 = (1-p2).^(v(ii,:)');
+        
+        % Compute determinant from prior and likelihood
+        g1(ii) = tPC1(1,i)*prod(p0C1 .* p1C1);
+        g2(ii) = tPC2(1,i)*prod(p0C2 .* p1C2);
+        
+        % Compare and choose class
+        if g1(ii) > g2(ii)
+            pred_for_sigma(ii) = 1;
+        else
+            pred_for_sigma(ii) = 2;
+        end
+        
+    end
+    
+    %compute errors
+    error = vClassLabels - pred_for_sigma;
+    
+    %  check for instances where error is 0
+    tResult(i) = sum(error(:) == 0);
+    
+    % Print output to the terminal
+    sprintf('For sigma = %d, Number of correct predictions: %d, Error rate: %.2f%%\n',...
+        sigma(i), tResult(i), (1-(tResult(i))/size(v,1))*100);
+    
+    % Clear g1, g2 and temp_pred for next sigma 
+    g1 = zeros(size(validation_data,1),1);
+    g2 = zeros(size(validation_data,1),1);
+    pred_for_sigma = zeros(size(validation_data,1),1);
+end
+
+% Take the sigma that produces minimum error on validation data
+[value, index] = max(tResult);
+fprintf('\nBest performance with sigma = %d, Error rate: %.2f%%\n',...
+    sigma(index), (1-(value/size(v,1)))*100);
+
+% Set best priors
+pc1 = tPC1(index);
+pc2 = tPC2(index);
+
+end
